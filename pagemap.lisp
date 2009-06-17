@@ -1,0 +1,51 @@
+;;; -*- Mode:Lisp; Syntax:ANSI-Common-Lisp; Coding:utf-8 -*-
+
+(in-package #:linux-vm-sys)
+
+(defun pagemap-for-pid (pid)
+  (declare (type fixnum pid) (optimize  (safety 3)))
+  (make-pathname :directory (append  '(:absolute "proc") (list (write-to-string pid :base 10))) :name "pagemap" :type nil))
+
+(defun page-for-address (address)
+  (- address (rem address *pagesize*)))
+
+(defun read-page-line (pid address)
+  (declare (type fixnum pid)
+	   ;(type (unsigned-byte 64) page)
+	   (optimize (safety 3))
+	   (inline page-for-address))
+  (with-open-file (*pagemap* (pagemap-for-pid pid) :element-type '(unsigned-byte 64)) 
+    (file-position *pagemap* (page-for-address address))
+    (read-byte *pagemap*)))
+(defun read-page-count (pfn)
+  (declare (type fixnum pfn))
+  (with-open-file (*pagecount* #P"/proc/kpagecount" :element-type '(unsigned-byte 64))
+    (file-position *pagecount* pfn)
+    (read-byte *pagecount*)))
+
+(make-accessors
+ (page-locked-p 0)
+ (page-error-p 1)
+ (page-referenced-p 2)
+ (page-uptodate-p 3)
+ (page-dirty-p 4)
+ (page-lru-p 5)
+ (page-active-p 6)
+ (page-slab-p 7)
+ (page-writeback-p 8)
+ (page-reclaim-p 9)
+ (page-buddy-p 10))
+
+(defun swapped-p (page)
+  (ldb-test (byte 1 1) page))
+(defun present-p (page)
+  (ldb-test (byte 1 0) page))
+(defun page->pfn (page)
+  (ldb (byte 56 9) page))
+(defun swap-type (page)
+  (ldb (byte 4 60) page))
+(defun swap-offset (page)
+  (ldb (byte 51 8) page))
+(defun page-shift (page)
+  (ldb (byte 55 5) page))
+
